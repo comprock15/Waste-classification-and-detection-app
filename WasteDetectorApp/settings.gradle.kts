@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "WasteDetector"
 include(":app")
+ 

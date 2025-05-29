@@ -3,8 +3,7 @@ package com.example.wastedetector
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
-import com.example.wastedetector.MetaData.extractNamesFromLabelFile
-import com.example.wastedetector.MetaData.extractNamesFromMetadata
+import androidx.core.graphics.scale
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
@@ -15,18 +14,18 @@ import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
-import androidx.core.graphics.scale
+import java.io.BufferedReader
+import java.io.IOException
+import java.io.InputStreamReader
 
 class Detector(
     private val context: Context,
     private val modelPath: String,
-    private val labelPath: String?,
+    private val labelsPath: String,
     private val detectorListener: DetectorListener,
-    private val message: (String) -> Unit
 ) {
-
-    private var interpreter: Interpreter
-    private var labels = mutableListOf<String>()
+    private lateinit var interpreter: Interpreter
+    private lateinit var labels: List<String>
 
     private var tensorWidth = 0
     private var tensorHeight = 0
@@ -39,6 +38,10 @@ class Detector(
         .build()
 
     init {
+        setupDetector()
+    }
+
+    fun setupDetector() {
         val compatList = CompatibilityList()
 
         val options = Interpreter.Options().apply{
@@ -56,16 +59,7 @@ class Detector(
         val inputShape = interpreter.getInputTensor(0)?.shape()
         val outputShape = interpreter.getOutputTensor(0)?.shape()
 
-
-        labels.addAll(extractNamesFromMetadata(model))
-        if (labels.isEmpty()) {
-            if (labelPath == null) {
-                message("Model not contains metadata, provide LABELS_PATH in Constants.kt")
-                labels.addAll(MetaData.TEMP_CLASSES)
-            } else {
-                labels.addAll(extractNamesFromLabelFile(context, labelPath))
-            }
-        }
+        labels = extractLabelsFromFile(context, labelsPath)
 
         if (inputShape != null) {
             tensorWidth = inputShape[1]
@@ -81,6 +75,20 @@ class Detector(
         if (outputShape != null) {
             numChannel = outputShape[1]
             numElements = outputShape[2]
+        }
+    }
+
+    fun extractLabelsFromFile(context: Context, labelsPath: String): List<String> {
+        return try {
+            context.assets.open(labelsPath).use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                    reader.lineSequence()
+                        .filter { it.isNotBlank() }
+                        .toList()
+                }
+            }
+        } catch (e: IOException) {
+            emptyList()
         }
     }
 
@@ -236,4 +244,5 @@ class Detector(
         private const val CONFIDENCE_THRESHOLD = 0.3F
         private const val IOU_THRESHOLD = 0.5F
     }
+
 }

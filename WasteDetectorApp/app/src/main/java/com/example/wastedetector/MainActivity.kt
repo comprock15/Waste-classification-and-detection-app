@@ -18,8 +18,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
-import com.example.wastedetector.Constants.LABELS_PATH
-import com.example.wastedetector.Constants.MODEL_PATH
 import com.example.wastedetector.databinding.ActivityMainBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -28,8 +26,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var bitmapBuffer: Bitmap
-
-    private var detector: Detector? = null
+    private lateinit var detector: Detector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,9 +42,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this) {
-            Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
-        }
+        detector = Detector(baseContext, MODEL, LABELS, this)
 
         startCamera()
     }
@@ -128,7 +123,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        detector?.close()
+        detector.close()
         cameraExecutor.shutdown()
     }
 
@@ -161,5 +156,9 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         private val PERMISSIONS_REQUIRED = arrayOf(
             android.Manifest.permission.CAMERA
         )
+
+        private const val MODEL = "yolo11.tflite"
+        private const val LABELS = "labels.txt"
     }
+
 }

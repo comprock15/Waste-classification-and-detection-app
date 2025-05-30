@@ -5,10 +5,16 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     tools:context=".MainActivity">
 
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+
+    <com.example.wastedetector.OverlayView
+        android:id="@+id/overlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 

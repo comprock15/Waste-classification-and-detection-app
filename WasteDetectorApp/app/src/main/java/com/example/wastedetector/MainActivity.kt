@@ -20,6 +20,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.example.wastedetector.databinding.ActivityMainBinding
+import org.tensorflow.lite.task.vision.detector.Detection
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -32,12 +33,12 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        initializeUI()
+        initializeUi()
         checkCameraPermissions()
         initializeComponents()
     }
 
-    private fun initializeUI() {
+    private fun initializeUi() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
     }
@@ -76,7 +77,10 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     private fun initializeComponents() {
         cameraExecutor = Executors.newSingleThreadExecutor()
-        detector = Detector(baseContext, MODEL, LABELS, this)
+        detector = Detector(
+            context = baseContext,
+            detectorListener = this
+        )
         startCamera()
     }
 
@@ -161,14 +165,10 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         }
     }
 
-    override fun onEmptyDetect() {
-        binding.overlayView.clear()
-    }
-
-    override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
+    override fun onDetect(detections: List<Detection>, inferenceTime: Long) {
         runOnUiThread {
             binding.overlayView.apply {
-                setResults(boundingBoxes)
+                setResults(detections)
                 invalidate()
             }
         }
@@ -186,9 +186,6 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         private val PERMISSIONS_REQUIRED = arrayOf(
             android.Manifest.permission.CAMERA
         )
-
-        private const val MODEL = "yolo11.tflite"
-        private const val LABELS = "labels.txt"
     }
 
 }

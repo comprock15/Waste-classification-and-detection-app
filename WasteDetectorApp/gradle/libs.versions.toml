@@ -14,7 +14,7 @@ tensorflowLite = "2.16.1"
 tensorflowLiteGpu = "2.16.1"
 tensorflowLiteGpuDelegatePlugin = "0.4.4"
 tensorflowLiteSupport = "0.4.4"
-tensorflowLiteTaskVision = "0.4.0"
+tensorflowLiteTaskVision = "0.4.4"
 
 [libraries]
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraxVersion" }

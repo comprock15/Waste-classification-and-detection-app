@@ -25,12 +25,13 @@ import java.io.InputStreamReader
 class Detector(
     val context: Context,
     val detectorListener: DetectorListener,
-    var threshold: Float = 0.5f,
-    var numThreads: Int = 2,
-    var maxResults: Int = 3
+    val confidenceThreshold: Float = 0.5f,
+    val numThreads: Int = 2,
+    val maxResults: Int = 3,
+    val iouThreshold: Float = 0.5F
 ) {
     private lateinit var interpreter: Interpreter
-    private var labels = extractLabelsFromFile(context, LABELS)
+    private val labels = extractLabelsFromFile(context, LABELS)
 
     private var tensorWidth = 0
     private var tensorHeight = 0
@@ -44,20 +45,15 @@ class Detector(
     }
 
     fun setupDetector() {
-        val compatList = CompatibilityList()
-
-        val options = Interpreter.Options().apply {
-            if (compatList.isDelegateSupportedOnThisDevice) {
-                val delegateOptions = compatList.bestOptionsForThisDevice
-                this.addDelegate(GpuDelegate(delegateOptions))
-            } else {
-                this.setNumThreads(numThreads)
-            }
-        }
-
+        val options = createOptions()
         val model = FileUtil.loadMappedFile(context, MODEL)
+        
         interpreter = Interpreter(model, options)
 
+        setupShape()
+    }
+
+    private fun setupShape() {
         val inputShape = interpreter.getInputTensor(0)?.shape()
         val outputShape = interpreter.getOutputTensor(0)?.shape()
 
@@ -75,6 +71,18 @@ class Detector(
         if (outputShape != null) {
             numChannel = outputShape[1]
             numElements = outputShape[2]
+        }
+    }
+
+    private fun createOptions(): Interpreter.Options {
+        val compatList = CompatibilityList()
+        return Interpreter.Options().apply {
+            if (compatList.isDelegateSupportedOnThisDevice) {
+                val delegateOptions = compatList.bestOptionsForThisDevice
+                this.addDelegate(GpuDelegate(delegateOptions))
+            } else {
+                this.setNumThreads(numThreads)
+            }
         }
     }
 
@@ -102,10 +110,8 @@ class Detector(
     }
 
     fun detect(frame: Bitmap) {
-        if (tensorWidth == 0
-            || tensorHeight == 0
-            || numChannel == 0
-            || numElements == 0) {
+        if (tensorWidth == 0 || tensorHeight == 0
+            || numChannel == 0 || numElements == 0) {
             return
         }
 
@@ -121,13 +127,13 @@ class Detector(
         val output = TensorBuffer.createFixedSize(intArrayOf(1, numChannel, numElements), OUTPUT_IMAGE_TYPE)
         interpreter.run(imageBuffer, output.buffer)
 
-        val bestBoxes = bestBox(output.floatArray)
+        val bestBoxes = calculateBestBoxes(output.floatArray).take(maxResults)
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
 
         detectorListener.onDetect(bestBoxes, inferenceTime)
     }
 
-    private fun bestBox(array: FloatArray) : List<Detection> {
+    private fun calculateBestBoxes(array: FloatArray) : List<Detection> {
 
         val detections = mutableListOf<Detection>()
 
@@ -141,7 +147,7 @@ class Detector(
             }
             categories.sortByDescending { it.score }
 
-            if (categories[0].score > threshold) {
+            if (categories[0].score > confidenceThreshold) {
                 val cx = array[c] // 0
                 val cy = array[c + numElements] // 1
                 val w = array[c + numElements * 2]
@@ -164,7 +170,7 @@ class Detector(
             }
         }
 
-        return applyNMS(detections).take(maxResults)
+        return applyNMS(detections)
     }
 
     private fun applyNMS(boxes: List<Detection>) : MutableList<Detection> {
@@ -180,7 +186,7 @@ class Detector(
             while (iterator.hasNext()) {
                 val nextBox = iterator.next()
                 val iou = calculateIoU(first, nextBox)
-                if (iou >= IOU_THRESHOLD) {
+                if (iou >= iouThreshold) {
                     iterator.remove()
                 }
             }
@@ -209,7 +215,6 @@ class Detector(
         private const val INPUT_STANDARD_DEVIATION = 255f
         private val INPUT_IMAGE_TYPE = DataType.FLOAT32
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
-        private const val IOU_THRESHOLD = 0.5F
 
         private const val MODEL = "yolo11.tflite"
         private const val LABELS = "labels.txt"

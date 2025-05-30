@@ -1,5 +1,6 @@
-package com.example.wastedetector
+package com.simpledimploma.wastedetector
 
+import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -19,7 +20,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
-import com.example.wastedetector.databinding.ActivityMainBinding
+import com.simpledimploma.wastedetector.databinding.ActivityMainBinding
 import org.tensorflow.lite.task.vision.detector.Detection
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -184,7 +185,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         private const val TAG = "Camera"
         private const val REQUEST_CODE_PERMISSIONS = 1
         private val PERMISSIONS_REQUIRED = arrayOf(
-            android.Manifest.permission.CAMERA
+            Manifest.permission.CAMERA
         )
     }
 

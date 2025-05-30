@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.wastedetector"
+    namespace = "com.simpledimploma.wastedetector"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.wastedetector"
+        applicationId = "com.simpledimploma.wastedetector"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

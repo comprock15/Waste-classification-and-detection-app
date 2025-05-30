@@ -1,10 +1,9 @@
-package com.example.wastedetector
+package com.simpledimploma.wastedetector
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.SystemClock
-import android.util.Log
 import androidx.core.graphics.scale
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter

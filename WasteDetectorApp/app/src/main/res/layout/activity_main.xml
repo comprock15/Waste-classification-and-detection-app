@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
-    <com.example.wastedetector.OverlayView
+    <com.simpledimploma.wastedetector.OverlayView
         android:id="@+id/overlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>

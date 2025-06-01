@@ -21,6 +21,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.simpledimploma.wastedetector.databinding.ActivityMainBinding
+import kotlinx.coroutines.android.awaitFrame
 import org.tensorflow.lite.task.vision.detector.Detection
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -176,12 +177,12 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        currentModel?.close()
         cameraExecutor.shutdown()
+        currentModel?.close()
     }
 
     private fun switchModel() {
-        return
+        //return
         isDetectionMode = !isDetectionMode
         initModel()
         updateButtonText()

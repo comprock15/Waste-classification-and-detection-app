@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.graphics.scale
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
@@ -38,6 +39,10 @@ class Detector(
     private var numElements = 0
 
     private val imageProcessor = createImageProcessor()
+
+    private val modelLock = Any()
+    private var isClosed = false
+
 
     init {
         setupDetector()
@@ -105,11 +110,28 @@ class Detector(
     }
 
     override fun process(image: Bitmap) {
-        detect(image)
+        if (isClosed) return
+
+        try {
+            synchronized(modelLock) {
+                if (!isClosed) {
+                    detect(image)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Detector", "Detection error", e)
+        }
     }
 
     override fun close() {
-        interpreter.close()
+        synchronized(modelLock) {
+            isClosed = true
+            try {
+                interpreter.close()
+            } catch (e: Exception) {
+                Log.e("Detector", "Error closing interpreter", e)
+            }
+        }
     }
 
     private fun detect(frame: Bitmap) {

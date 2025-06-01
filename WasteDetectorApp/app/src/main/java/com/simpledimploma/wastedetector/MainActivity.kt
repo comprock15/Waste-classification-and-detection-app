@@ -29,7 +29,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var bitmapBuffer: Bitmap
-    private lateinit var detector: Detector
+    private var currentModel: ModelExecutor? = null
+    private var isDetectionMode: Boolean = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +43,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     private fun initializeUi() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.switchModelButton.setOnClickListener { switchModel() }
     }
 
     // ----------------- Permissions ---------------------
@@ -78,10 +80,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     private fun initializeComponents() {
         cameraExecutor = Executors.newSingleThreadExecutor()
-        detector = Detector(
-            context = baseContext,
-            detectorListener = this
-        )
+        initModel()
         startCamera()
     }
 
@@ -147,7 +146,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         }
 
         processCameraImage(image).let { processedImage ->
-            detector.detect(processedImage)
+            currentModel?.process(processedImage)
         }
     }
 
@@ -177,8 +176,41 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        detector.close()
+        currentModel?.close()
         cameraExecutor.shutdown()
+    }
+
+    private fun switchModel() {
+        return
+        isDetectionMode = !isDetectionMode
+        initModel()
+        updateButtonText()
+        updatePredictionText()
+    }
+
+    private fun initModel() {
+        currentModel?.close()
+        currentModel = if (isDetectionMode) {
+            Detector(
+                context = baseContext,
+                detectorListener = this
+            )
+        } else {
+            Log.w("MODEL", "Classifier not implemented")
+            null
+        }
+    }
+
+    private fun updateButtonText() {
+        binding.switchModelButton.text =
+            if (isDetectionMode) getString(R.string.switch_to_classification_text)
+            else getString(R.string.switch_to_detection_text)
+    }
+
+    private fun updatePredictionText() {
+        binding.predictionTextView.text =
+            if (isDetectionMode) ""
+            else getString(R.string.prediction_text)
     }
 
     companion object {

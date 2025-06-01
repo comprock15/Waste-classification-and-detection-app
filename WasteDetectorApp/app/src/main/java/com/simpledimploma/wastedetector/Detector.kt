@@ -28,7 +28,7 @@ class Detector(
     val numThreads: Int = 2,
     val maxResults: Int = 3,
     val iouThreshold: Float = 0.5F
-) {
+) : ModelExecutor {
     private lateinit var interpreter: Interpreter
     private val labels = extractLabelsFromFile(context, LABELS)
 
@@ -104,11 +104,15 @@ class Detector(
         }
     }
 
-    fun close() {
+    override fun process(image: Bitmap) {
+        detect(image)
+    }
+
+    override fun close() {
         interpreter.close()
     }
 
-    fun detect(frame: Bitmap) {
+    private fun detect(frame: Bitmap) {
         if (tensorWidth == 0 || tensorHeight == 0
             || numChannel == 0 || numElements == 0) {
             return
@@ -215,7 +219,7 @@ class Detector(
         private val INPUT_IMAGE_TYPE = DataType.FLOAT32
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
 
-        private const val MODEL = "yolo11.tflite"
+        private const val MODEL = "detection_model.tflite"
         private const val LABELS = "labels.txt"
     }
 

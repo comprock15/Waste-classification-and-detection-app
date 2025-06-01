@@ -2,6 +2,4 @@
     <string name="app_name">WasteDetector</string>
     <string name="switch_to_classification_text">Switch to classification</string>
     <string name="switch_to_detection_text">Switch to detection</string>
-    <string name="prediction_text">Aluminum can 0.6</string>
-
 </resources>

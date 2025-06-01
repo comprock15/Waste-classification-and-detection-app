@@ -22,16 +22,17 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.simpledimploma.wastedetector.databinding.ActivityMainBinding
 import kotlinx.coroutines.android.awaitFrame
+import org.tensorflow.lite.support.label.Category
 import org.tensorflow.lite.task.vision.detector.Detection
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity(), Detector.DetectorListener {
+class MainActivity : AppCompatActivity(), Detector.DetectorListener, Classifier.ClassifierListener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var bitmapBuffer: Bitmap
     private var currentModel: ModelExecutor? = null
-    private var isDetectionMode: Boolean = true
+    private var isDetectionMode: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -169,9 +170,21 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     override fun onDetect(detections: List<Detection>, inferenceTime: Long) {
         runOnUiThread {
             binding.overlayView.apply {
-                setResults(detections)
+                if (isDetectionMode)
+                    setResults(detections)
+                else
+                    setResults(emptyList())
                 invalidate()
             }
+        }
+    }
+
+    override fun onClassify(category: Category, inferenceTime: Long) {
+        runOnUiThread {
+            if (!isDetectionMode)
+                binding.predictionTextView.text = "${category.label} ${String.format("%.2f", category.score)}"
+            else
+                updatePredictionText()
         }
     }
 
@@ -197,8 +210,10 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
                 detectorListener = this
             )
         } else {
-            Log.w("MODEL", "Classifier not implemented")
-            null
+            Classifier(
+                context = baseContext,
+                classifierListener = this
+            )
         }
     }
 
@@ -209,9 +224,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     }
 
     private fun updatePredictionText() {
-        binding.predictionTextView.text =
-            if (isDetectionMode) ""
-            else getString(R.string.prediction_text)
+        binding.predictionTextView.text = ""
     }
 
     companion object {

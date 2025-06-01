@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">WasteDetector</string>
+    <string name="switch_to_classification_text">Switch to classification</string>
+    <string name="switch_to_detection_text">Switch to detection</string>
 </resources>

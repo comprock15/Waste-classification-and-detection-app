@@ -17,41 +17,35 @@ import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.label.Category
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
-import org.tensorflow.lite.task.vision.detector.Detection
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
 
-class Detector(
+class Classifier(
     val context: Context,
-    val detectorListener: DetectorListener,
-    val confidenceThreshold: Float = 0.5f,
+    val classifierListener: ClassifierListener,
     val numThreads: Int = 2,
-    val maxResults: Int = 3,
-    val iouThreshold: Float = 0.5F
 ) : ModelExecutor {
     private lateinit var interpreter: Interpreter
     private val labels = extractLabelsFromFile(context, LABELS)
 
     private var tensorWidth = 0
     private var tensorHeight = 0
-    private var numChannel = 0
-    private var numElements = 0
+    private var numCategories = 0
 
     private val imageProcessor = createImageProcessor()
 
     private val modelLock = Any()
     private var isClosed = false
 
-
     init {
-        setupDetector()
+        setupClassifier()
     }
 
-    fun setupDetector() {
+    fun setupClassifier() {
         val options = createOptions()
         val model = FileUtil.loadMappedFile(context, MODEL)
-        
+
         interpreter = Interpreter(model, options)
 
         setupShape()
@@ -73,8 +67,7 @@ class Detector(
         }
 
         if (outputShape != null) {
-            numChannel = outputShape[1]
-            numElements = outputShape[2]
+            numCategories = outputShape[1]
         }
     }
 
@@ -115,11 +108,11 @@ class Detector(
         try {
             synchronized(modelLock) {
                 if (!isClosed) {
-                    detect(image)
+                    classify(image)
                 }
             }
         } catch (e: Exception) {
-            Log.e("Detector", "Detection error", e)
+            Log.e("Classifier", "Classification error", e)
         }
     }
 
@@ -129,14 +122,14 @@ class Detector(
             try {
                 interpreter.close()
             } catch (e: Exception) {
-                Log.e("Detector", "Error closing interpreter", e)
+                Log.e("Classifier", "Error closing interpreter", e)
             }
         }
     }
 
-    private fun detect(frame: Bitmap) {
+    private fun classify(frame: Bitmap) {
         if (tensorWidth == 0 || tensorHeight == 0
-            || numChannel == 0 || numElements == 0) {
+            || numCategories == 0) {
             return
         }
 
@@ -149,90 +142,24 @@ class Detector(
         val processedImage = imageProcessor.process(tensorImage)
         val imageBuffer = processedImage.buffer
 
-        val output = TensorBuffer.createFixedSize(intArrayOf(1, numChannel, numElements), OUTPUT_IMAGE_TYPE)
+        val output = TensorBuffer.createFixedSize(intArrayOf(1, numCategories), OUTPUT_IMAGE_TYPE)
         interpreter.run(imageBuffer, output.buffer)
 
-        val bestBoxes = calculateBestBoxes(output.floatArray).take(maxResults)
+        val results = processOutput(output.floatArray)
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
 
-        detectorListener.onDetect(bestBoxes, inferenceTime)
+        classifierListener.onClassify(results, inferenceTime)
     }
 
-    private fun calculateBestBoxes(array: FloatArray) : List<Detection> {
-
-        val detections = mutableListOf<Detection>()
-
-        for (c in 0 until numElements) {
-            val categories = mutableListOf<Category>()
-
-            for (j in 4 until numChannel) {
-                categories.add(
-                    Category(labels[j-4], array[c + numElements * j])
-                )
-            }
-            categories.sortByDescending { it.score }
-
-            if (categories[0].score > confidenceThreshold) {
-                val cx = array[c] // 0
-                val cy = array[c + numElements] // 1
-                val w = array[c + numElements * 2]
-                val h = array[c + numElements * 3]
-                val x1 = cx - (w/2F)
-                val y1 = cy - (h/2F)
-                val x2 = cx + (w/2F)
-                val y2 = cy + (h/2F)
-                if (x1 < 0F || x1 > 1F) continue
-                if (y1 < 0F || y1 > 1F) continue
-                if (x2 < 0F || x2 > 1F) continue
-                if (y2 < 0F || y2 > 1F) continue
-
-                detections.add(
-                    Detection.create(
-                        RectF(x1, y1, x2, y2),
-                        categories
-                    )
-                )
-            }
-        }
-
-        return applyNMS(detections)
+    private fun processOutput(outputArray: FloatArray): Category {
+        return labels.mapIndexed { index, label ->
+            Category(label, outputArray[index])
+        }.sortedByDescending { it.score }[0]
     }
 
-    private fun applyNMS(boxes: List<Detection>) : MutableList<Detection> {
-        val sortedBoxes = boxes.sortedByDescending { it.categories[0].score }.toMutableList()
-        val selectedBoxes = mutableListOf<Detection>()
 
-        while(sortedBoxes.isNotEmpty()) {
-            val first = sortedBoxes.first()
-            selectedBoxes.add(first)
-            sortedBoxes.remove(first)
-
-            val iterator = sortedBoxes.iterator()
-            while (iterator.hasNext()) {
-                val nextBox = iterator.next()
-                val iou = calculateIoU(first, nextBox)
-                if (iou >= iouThreshold) {
-                    iterator.remove()
-                }
-            }
-        }
-
-        return selectedBoxes
-    }
-
-    private fun calculateIoU(box1: Detection, box2: Detection): Float {
-        val left = maxOf(box1.boundingBox.left, box2.boundingBox.left)
-        val bottom = maxOf(box1.boundingBox.bottom, box2.boundingBox.bottom)
-        val right = minOf(box1.boundingBox.right, box2.boundingBox.right)
-        val top = minOf(box1.boundingBox.top, box2.boundingBox.top)
-        val intersectionArea = maxOf(0F, right - left) * maxOf(0F, bottom - top)
-        val box1Area = box1.boundingBox.width() * box1.boundingBox.height()
-        val box2Area = box2.boundingBox.width() * box2.boundingBox.height()
-        return intersectionArea / (box1Area + box2Area - intersectionArea)
-    }
-
-    interface DetectorListener {
-        fun onDetect(detections: List<Detection>, inferenceTime: Long)
+    interface ClassifierListener {
+        fun onClassify(category: Category, inferenceTime: Long)
     }
 
     companion object {
@@ -241,7 +168,7 @@ class Detector(
         private val INPUT_IMAGE_TYPE = DataType.FLOAT32
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
 
-        private const val MODEL = "detection_model.tflite"
+        private const val MODEL = "classification_model.tflite"
         private const val LABELS = "labels.txt"
     }
 

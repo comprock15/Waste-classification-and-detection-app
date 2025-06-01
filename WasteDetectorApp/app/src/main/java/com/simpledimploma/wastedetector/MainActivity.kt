@@ -21,15 +21,18 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.simpledimploma.wastedetector.databinding.ActivityMainBinding
+import kotlinx.coroutines.android.awaitFrame
+import org.tensorflow.lite.support.label.Category
 import org.tensorflow.lite.task.vision.detector.Detection
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity(), Detector.DetectorListener {
+class MainActivity : AppCompatActivity(), Detector.DetectorListener, Classifier.ClassifierListener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var bitmapBuffer: Bitmap
-    private lateinit var detector: Detector
+    private var currentModel: ModelExecutor? = null
+    private var isDetectionMode: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +45,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     private fun initializeUi() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.switchModelButton.setOnClickListener { switchModel() }
     }
 
     // ----------------- Permissions ---------------------
@@ -78,10 +82,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     private fun initializeComponents() {
         cameraExecutor = Executors.newSingleThreadExecutor()
-        detector = Detector(
-            context = baseContext,
-            detectorListener = this
-        )
+        initModel()
         startCamera()
     }
 
@@ -147,7 +148,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         }
 
         processCameraImage(image).let { processedImage ->
-            detector.detect(processedImage)
+            currentModel?.process(processedImage)
         }
     }
 
@@ -169,16 +170,61 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     override fun onDetect(detections: List<Detection>, inferenceTime: Long) {
         runOnUiThread {
             binding.overlayView.apply {
-                setResults(detections)
+                if (isDetectionMode)
+                    setResults(detections)
+                else
+                    setResults(emptyList())
                 invalidate()
             }
         }
     }
 
+    override fun onClassify(category: Category, inferenceTime: Long) {
+        runOnUiThread {
+            if (!isDetectionMode)
+                binding.predictionTextView.text = "${category.label} ${String.format("%.2f", category.score)}"
+            else
+                updatePredictionText()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        detector.close()
         cameraExecutor.shutdown()
+        currentModel?.close()
+    }
+
+    private fun switchModel() {
+        //return
+        isDetectionMode = !isDetectionMode
+        initModel()
+        updateButtonText()
+        updatePredictionText()
+    }
+
+    private fun initModel() {
+        currentModel?.close()
+        currentModel = if (isDetectionMode) {
+            Detector(
+                context = baseContext,
+                detectorListener = this
+            )
+        } else {
+            Classifier(
+                context = baseContext,
+                classifierListener = this
+            )
+        }
+    }
+
+    private fun updateButtonText() {
+        binding.switchModelButton.text =
+            if (isDetectionMode) getString(R.string.switch_to_classification_text)
+            else getString(R.string.switch_to_detection_text)
+    }
+
+    private fun updatePredictionText() {
+        binding.predictionTextView.text = ""
     }
 
     companion object {
